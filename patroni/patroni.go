@@ -68,14 +68,14 @@ func (cluster *PatroniCluster) GetLeaderCandidate() PatroniMember {
 	return replicas[rand.Intn(len(replicas))]
 }
 
-func (cluster *PatroniCluster) IsHealthy() bool {
+func (cluster *PatroniCluster) IsHealthy(expectedCount int) bool {
 	for _, member := range cluster.Members {
 		if member.State != "running" && member.State != "streaming" {
 			return false
 		}
 	}
 
-	return true
+	return len(cluster.Members) == expectedCount
 }
 
 func getTlsConfigs(patrConf *config.PatroniClientConfig) (*tls.Config, error) {
@@ -206,24 +206,18 @@ func (pClient *PatroniClient) Switchover(excludeLeader bool) (SwitchoverResult, 
 	return result, nil
 }
 
-func (pClient *PatroniClient) WaitForHealthy(timeout time.Duration) error {
+func (pClient *PatroniClient) WaitForHealthy(timeout time.Duration, expectedCount int) error {
 	deadline := time.NewTimer(timeout)
 
 	cluster, clusterErr := pClient.GetCluster()
-	if clusterErr != nil {
-		return clusterErr
-	}
 
-	for !cluster.IsHealthy() {
+	for clusterErr != nil || !cluster.IsHealthy(expectedCount) {
 		select {
 		case <-deadline.C:
 			return errors.New(fmt.Sprintf("Cluster was not healthy within the deadline of %s", timeout.String()))
 		}
 
 		cluster, clusterErr = pClient.GetCluster()
-		if clusterErr != nil {
-			return clusterErr
-		}
 	}
 
 	return nil
@@ -246,7 +240,7 @@ func (pClient *PatroniClient) ForceLeaderChange(timeout time.Duration) error {
 		switchRes.NewLeader = cluster.GetLeader().Name
 	}
 
-	healthErr := pClient.WaitForHealthy(timeout)
+	healthErr := pClient.WaitForHealthy(timeout, len(cluster.Members))
 	if healthErr != nil {
 		return healthErr
 	}

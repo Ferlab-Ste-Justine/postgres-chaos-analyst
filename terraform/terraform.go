@@ -2,11 +2,13 @@ package terraform
 
 import (
 	"context"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 
 	"github.com/Ferlab-Ste-Justine/postgres-chaos-analyst/config"
+	"github.com/Ferlab-Ste-Justine/postgres-chaos-analyst/logger"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	yaml "gopkg.in/yaml.v2"
@@ -24,7 +26,7 @@ type ServersStatus struct {
 func (status *ServersStatus) SetActivation(name string, up bool) {
 	for idx, _ := range status.Cluster {
 		if status.Cluster[idx].Name == name {
-			status.Cluster[idx].up = up
+			status.Cluster[idx].Up = up
 			break
 		}
 	}
@@ -51,7 +53,7 @@ func persistServersStatus(fPath string, status ServersStatus) error {
 	return os.WriteFile(fPath, data, 0644)
 }
 
-func SetServerActivation(name string, up bool, conf *config.TerraformConfig) error {
+func SetServerActivation(name string, up bool, conf *config.TerraformConfig, log logger.Logger) error {
 	clusPath := path.Join(conf.Directory, conf.ClusterFile)
 	
 	status, readErr := readServerStatus(clusPath)
@@ -76,13 +78,23 @@ func SetServerActivation(name string, up bool, conf *config.TerraformConfig) err
 		return tfErr
 	}
 
-	initErr = tf.Init(context.Background(), tfexec.Upgrade(true))
+	initErr := tf.Init(context.Background(), tfexec.Upgrade(true))
 	if initErr != nil {
 		return initErr
 	}
 
-	applyErr = tf.Apply(context.Background())
+	applyErr := tf.Apply(context.Background())
 	if applyErr != nil {
 		return applyErr
 	}
+
+	var action string
+	if up {
+		action = "created"
+	} else {
+		action = "destroyed"
+	}
+	log.Infof("Server \"%s\" has been %s", name, action)
+
+	return nil
 }
