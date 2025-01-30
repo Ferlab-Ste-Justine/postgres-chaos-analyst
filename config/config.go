@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"time"
+	"net/url"
 
 	"github.com/Ferlab-Ste-Justine/postgres-chaos-analyst/logger"
 
@@ -28,14 +29,14 @@ type PgClientConfig struct {
 	Endpoint          string
 	Auth              PgClientAuthConfig
 	Database          string
-	ConnectionTimeout time.Duration `yaml:"connection_timeout"`
-	QueryTimeout      time.Duration `yaml:"query_timeout"`
+	ConnectionTimeout time.Duration      `yaml:"connection_timeout"`
+	QueryTimeout      time.Duration      `yaml:"query_timeout"`
 }
 
 func (conf *PgClientConfig) GetConnStr() string {
-	conn := fmt.Sprintf("postgres://%s:%s@%s/database_name", conf.Auth.Username, conf.Auth.Password, conf.Endpoint, conf.Database)
+	conn := fmt.Sprintf("postgres://%s:%s@%s/%s", url.QueryEscape(conf.Auth.Username), url.QueryEscape(conf.Auth.Password), conf.Endpoint, conf.Database)
 	if conf.Auth.CaCert != "" {
-		conn = fmt.Sprintf("%s?sslmode=verify-full&sslrootcert=%", conn, conf.Auth.CaCert)
+		conn = fmt.Sprintf("%s?sslmode=verify-full&sslrootcert=%s", conn, url.QueryEscape(conf.Auth.CaCert))
 	}
 
 	return conn

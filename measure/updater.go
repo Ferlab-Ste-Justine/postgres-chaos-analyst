@@ -2,6 +2,7 @@ package measure
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type Updater struct {
-	DbName string
+	TableName string
 	index int64
 }
 
@@ -32,7 +33,7 @@ func (up *Updater) Initialize(conf *config.PgClientConfig) error {
 	}
 
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
-	_, txErr = tx.Exec(ctx, "CREATE TABLE $1 (id integer CONSTRAINT PRIMARY KEY, value bigint NOT NULL,);", up.DbName)
+	_, txErr = tx.Exec(ctx, fmt.Sprintf("CREATE TABLE %s (value bigint NOT NULL);", up.TableName))
 	if txErr != nil {
 		return txErr
 	}
@@ -64,7 +65,7 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 	//Do stuff
 	if up.index > 0 {
 		ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
-		rows, queryErr := tx.Query(ctx, "SELECT value from tests_updater;")
+		rows, queryErr := tx.Query(ctx, fmt.Sprintf("SELECT value from %s;", up.TableName))
 		if queryErr != nil {
 			return false, queryErr
 		}
@@ -86,7 +87,7 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 		}
 	}
 
-	_, txErr = tx.Exec(ctx, "UPDATE $1 SET value = $2;", up.DbName, up.index)
+	_, txErr = tx.Exec(ctx, fmt.Sprintf("UPDATE %s SET value = $1;", up.TableName), up.index)
 	if txErr != nil {
 		return lostTx, txErr
 	}
@@ -121,7 +122,7 @@ func (up *Updater) Cleanup(conf *config.PgClientConfig) error {
 
 	//Cleanup
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
-	_, txErr = tx.Exec(ctx, "CREATE TABLE $1;", up.DbName)
+	_, txErr = tx.Exec(ctx, fmt.Sprintf("DROP TABLE %s;", up.TableName))
 	if txErr != nil {
 		return txErr
 	}

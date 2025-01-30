@@ -17,7 +17,9 @@ func main() {
 
 	doneCh := make(chan struct{})
 	measResCh := measure.Measure(
-		&measure.Updater{},
+		&measure.Updater{
+			TableName: "switchover_updater",
+		},
 		&conf.PgClient,
 		conf.Tests.ConsFailTolerance,
 		doneCh,

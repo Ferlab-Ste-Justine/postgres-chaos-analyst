@@ -26,10 +26,10 @@ func (meas *Measurements) String() string {
 	return strings.Join([]string{
 		fmt.Sprintf("Total Ops: %d", meas.TotalOps),
 		fmt.Sprintf("Lost Ops: %d", meas.LostOps),
-		fmt.Sprintf("Outages:", meas.LostOps),
+		fmt.Sprintf("Outages:"),
 		fmt.Sprintf("\tCount: %d", meas.Outages.Count),
-		fmt.Sprintf("\tCumulative Duration: %d", meas.Outages.TotalDuration.String()),
-		fmt.Sprintf("\tLongest One: %d", meas.Outages.Longest.String()),
+		fmt.Sprintf("\tCumulative Duration: %s", meas.Outages.TotalDuration.String()),
+		fmt.Sprintf("\tLongest One: %s", meas.Outages.Longest.String()),
 	}, "\n")
 }
 
