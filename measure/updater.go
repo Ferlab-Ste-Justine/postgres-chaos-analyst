@@ -38,6 +38,11 @@ func (up *Updater) Initialize(conf *config.PgClientConfig) error {
 		return txErr
 	}
 
+	_, txErr = tx.Exec(ctx, fmt.Sprintf("INSERT INTO %s (value) VALUES ($1);", up.TableName), up.index)
+	if txErr != nil {
+		return txErr
+	}
+
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
 	commErr := tx.Commit(ctx)
 	return commErr
@@ -62,28 +67,35 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 	}
 
 	lostTx := false
-	//Do stuff
 	if up.index > 0 {
-		ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
-		rows, queryErr := tx.Query(ctx, fmt.Sprintf("SELECT value from %s;", up.TableName))
-		if queryErr != nil {
-			return false, queryErr
-		}
-		defer rows.Close()
-
-		if rows.Next() {
-			var scanVal int64
-			scanErr := rows.Scan(&scanVal)
-			if scanErr != nil {
-				return false, scanErr
+		queryErr := func() error {
+			ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
+			rows, queryErr := tx.Query(ctx, fmt.Sprintf("SELECT value from %s;", up.TableName))
+			if queryErr != nil {
+				return queryErr
 			}
+			defer rows.Close()
 	
-			if (scanVal + 1) != up.index {
+			if rows.Next() {
+				var scanVal int64
+				scanErr := rows.Scan(&scanVal)
+				if scanErr != nil {
+					return scanErr
+				}
+		
+				if (scanVal + 1) != up.index {
+					lostTx = true
+					up.index = scanVal + 1
+				}
+			} else {
 				lostTx = true
-				up.index = scanVal + 1
 			}
-		} else {
-			lostTx = true
+
+			return nil
+		}()
+
+		if queryErr != nil {
+			return lostTx, queryErr 
 		}
 	}
 
@@ -91,13 +103,14 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 	if txErr != nil {
 		return lostTx, txErr
 	}
-	up.index += 1;
 
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
 	commErr := tx.Commit(ctx)
 	if commErr != nil {
 		return lostTx, commErr
 	}
+
+	up.index += 1;
 
 	return lostTx, nil
 }
@@ -120,7 +133,6 @@ func (up *Updater) Cleanup(conf *config.PgClientConfig) error {
 		return txErr
 	}
 
-	//Cleanup
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
 	_, txErr = tx.Exec(ctx, fmt.Sprintf("DROP TABLE %s;", up.TableName))
 	if txErr != nil {

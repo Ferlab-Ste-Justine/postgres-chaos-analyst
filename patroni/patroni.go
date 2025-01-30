@@ -120,6 +120,7 @@ type PatroniClient struct {
 	client   *http.Client
 	endpoint string
 	log      logger.Logger
+	conf     *config.PatroniClientConfig
 }
 
 func NewPatroniClient(patrConf *config.PatroniClientConfig, log logger.Logger) (PatroniClient, error) {
@@ -139,6 +140,7 @@ func NewPatroniClient(patrConf *config.PatroniClientConfig, log logger.Logger) (
 		},
 		endpoint: patrConf.Endpoint,
 		log: log,
+		conf: patrConf,
 	}, nil
 }
 
@@ -228,6 +230,12 @@ func (pClient *PatroniClient) WaitForHealthy(timeout time.Duration, expectedCoun
 		}
 
 		cluster, clusterErr = pClient.GetCluster()
+		if clusterErr != nil {
+			cli, cliErr := NewPatroniClient(pClient.conf, pClient.log)
+			if cliErr == nil {
+				(*pClient) = cli
+			}
+		}
 	}
 
 	return nil

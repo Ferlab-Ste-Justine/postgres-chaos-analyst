@@ -1,7 +1,6 @@
 package measure
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -45,7 +44,7 @@ type Tester interface {
 	Id() string
 }
 
-func Measure(tester Tester, pgConf *config.PgClientConfig, consFailTolerance int64, done <-chan struct{}, log logger.Logger) <-chan MeasureResult {
+func Measure(tester Tester, pgConf *config.PgClientConfig, done <-chan struct{}, log logger.Logger) <-chan MeasureResult {
 	chRes := make(chan MeasureResult)
 
 	go func() {
@@ -58,7 +57,6 @@ func Measure(tester Tester, pgConf *config.PgClientConfig, consFailTolerance int
 		var measurements Measurements
 
 		var outageSince *time.Time
-		consFailures := int64(0)
 		for true {
 			select {
 			case <-done:
@@ -69,6 +67,7 @@ func Measure(tester Tester, pgConf *config.PgClientConfig, consFailTolerance int
 
 				chRes <- MeasureResult{Measurements: measurements, Error: nil}
 				return
+			default:
 			}
 
 			lostOp, runErr := tester.Run(pgConf)
@@ -81,24 +80,13 @@ func Measure(tester Tester, pgConf *config.PgClientConfig, consFailTolerance int
 
 			if runErr != nil {
 				if outageSince == nil {
+					log.Infof("Tester \"%s\" outage started with error: %s", tester.Id(), runErr.Error())
 					now := time.Now()
 					outageSince = &now
 					measurements.Outages.Count += 1
-				} else {
-					consFailures += 1
-					if consFailures > consFailTolerance {
-						cleanupErr := tester.Cleanup(pgConf)
-						if cleanupErr != nil {
-							log.Warnf("Test cleanup failed for tester \"%s\"", tester.Id())
-						}
-
-						chRes <- MeasureResult{Measurements: measurements, Error: errors.New(fmt.Sprintf("Had %d consecutive failures for test \"%s\". Aborting.", consFailures, tester.Id()))}
-						return
-					}
-				}
+				} 
 			} else {
 				if outageSince != nil {
-					consFailures = 0
 					outageDuration := time.Since(*outageSince)
 					outageSince = nil
 					if outageDuration.Nanoseconds() > measurements.Outages.Longest.Nanoseconds() {

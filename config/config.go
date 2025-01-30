@@ -61,7 +61,6 @@ type TestsConfig struct {
 	Switchovers          int64
 	LeaderCrashes        int64         `yaml:"leader_crashes"`
 	SyncStanbyCrashes    int64         `yaml:"sync_standby_crashes"`
-	ConsFailTolerance    int64         `yaml:"consecutive_failure_tolerance"`
 	ValidationInterval   time.Duration `yaml:"validation_interval"`
 	ChangeRecoverTimeout time.Duration `yaml:"change_recover_timeout"`
 	CrashRecoverTimeout  time.Duration `yaml:"crash_recover_timeout"`

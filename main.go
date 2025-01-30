@@ -18,7 +18,6 @@ func validateSwitchovers(conf config.Config, log logger.Logger) {
 			TableName: "switchover_updater",
 		},
 		&conf.PgClient,
-		conf.Tests.ConsFailTolerance,
 		doneCh,
 		log,
 	)
@@ -92,7 +91,6 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 			TableName: table,
 		},
 		&conf.PgClient,
-		conf.Tests.ConsFailTolerance,
 		doneCh,
 		log,
 	)
@@ -142,7 +140,7 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 				return
 			}
 
-			healthErr := pClient.WaitForHealthy(conf.Tests.ChangeRecoverTimeout, len(clus.Members))
+			healthErr := pClient.WaitForHealthy(conf.Tests.CrashRecoverTimeout, len(clus.Members))
 			if healthErr != nil {
 				crResCh <- healthErr
 				return
