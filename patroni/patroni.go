@@ -49,6 +49,16 @@ func (cluster *PatroniCluster) GetLeader() PatroniMember {
 	return PatroniMember{}
 }
 
+func (cluster *PatroniCluster) GetSyncStandby() PatroniMember {
+	for _, member := range cluster.Members {
+		if member.Role == "sync_standby" {
+			return member
+		}
+	}
+
+	return PatroniMember{}
+}
+
 func (cluster *PatroniCluster) GetLeaderCandidate() PatroniMember {
 	replicas := []PatroniMember{}
 	for _, member := range cluster.Members {

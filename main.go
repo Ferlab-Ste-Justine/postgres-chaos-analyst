@@ -122,13 +122,21 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 				return
 			}
 
-			terErr := terraform.SetServerActivation(clus.GetLeader().Name, false, &conf.Terraform, log)
+			var nodeName string
+			switch crashTarget {
+			case Leader:
+				nodeName = clus.GetLeader().Name
+			case SyncStandby:
+				nodeName = clus.GetSyncStandby().Name
+			}
+
+			terErr := terraform.SetServerActivation(nodeName, false, &conf.Terraform, log)
 			if terErr != nil {
 				crResCh <- terErr
 				return
 			}
 
-			terErr = terraform.SetServerActivation(clus.GetLeader().Name, true, &conf.Terraform, log)
+			terErr = terraform.SetServerActivation(nodeName, true, &conf.Terraform, log)
 			if terErr != nil {
 				crResCh <- terErr
 				return
