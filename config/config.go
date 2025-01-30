@@ -67,11 +67,17 @@ type TestsConfig struct {
 	CrashRecoverTimeout  time.Duration `yaml:"crash_recover_timeout"`
 }
 
+type TerraformConfig struct {
+	Directory   string
+	ClusterFile string `yaml:"cluster_file"`
+}
+
 type Config struct {
 	PgClient      PgClientConfig      `yaml:"postgres_client"`
 	PatroniClient PatroniClientConfig `yaml:"patroni_client"`
 	LogLevel      string              `yaml:"log_level"`
 	Tests         TestsConfig
+	Terraform     TerraformConfig
 }
 
 func (c *Config) GetLogLevel() int64 {

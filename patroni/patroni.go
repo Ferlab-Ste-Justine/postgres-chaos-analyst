@@ -206,8 +206,30 @@ func (pClient *PatroniClient) Switchover(excludeLeader bool) (SwitchoverResult, 
 	return result, nil
 }
 
-func (pClient *PatroniClient) ForceLeaderChange(timeout time.Duration) error {
+func (pClient *PatroniClient) WaitForHealthy(timeout time.Duration) error {
 	deadline := time.NewTimer(timeout)
+
+	cluster, clusterErr := pClient.GetCluster()
+	if clusterErr != nil {
+		return clusterErr
+	}
+
+	for !cluster.IsHealthy() {
+		select {
+		case <-deadline.C:
+			return errors.New(fmt.Sprintf("Cluster was not healthy within the deadline of %s", timeout.String()))
+		}
+
+		cluster, clusterErr = pClient.GetCluster()
+		if clusterErr != nil {
+			return clusterErr
+		}
+	}
+
+	return nil
+}
+
+func (pClient *PatroniClient) ForceLeaderChange(timeout time.Duration) error {
 	begining := time.Now()
 
 	switchRes, switchErr := pClient.Switchover(true)
@@ -224,16 +246,9 @@ func (pClient *PatroniClient) ForceLeaderChange(timeout time.Duration) error {
 		switchRes.NewLeader = cluster.GetLeader().Name
 	}
 
-	for !cluster.IsHealthy() {
-		select {
-		case <-deadline.C:
-			return errors.New(fmt.Sprintf("Could not switchover leader and recover within the deadline of %s", timeout.String()))
-		}
-
-		cluster, clusterErr = pClient.GetCluster()
-		if clusterErr != nil {
-			return clusterErr
-		}
+	healthErr := pClient.WaitForHealthy(timeout)
+	if healthErr != nil {
+		return healthErr
 	}
 
 	pClient.log.Infof("Switchover from leader \"%s\" to leader \"%s\" with healthy cluster in %s", switchRes.PreviousLeader, switchRes.NewLeader, time.Now().Sub(begining).String())
