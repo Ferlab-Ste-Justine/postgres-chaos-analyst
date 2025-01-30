@@ -128,6 +128,8 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 				nodeName = clus.GetSyncStandby().Name
 			}
 
+			beginning := time.Now()
+
 			terErr := terraform.SetServerActivation(nodeName, false, &conf.Terraform, log)
 			if terErr != nil {
 				crResCh <- terErr
@@ -145,6 +147,8 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 				crResCh <- healthErr
 				return
 			}
+
+			log.Infof("Fully recovered from %s to healthy cluster in %s", action, time.Now().Sub(beginning).String())
 
 			time.Sleep(conf.Tests.ValidationInterval)
 			iterations += 1

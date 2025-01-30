@@ -227,6 +227,7 @@ func (pClient *PatroniClient) WaitForHealthy(timeout time.Duration, expectedCoun
 		select {
 		case <-deadline.C:
 			return errors.New(fmt.Sprintf("Cluster was not healthy within the deadline of %s", timeout.String()))
+		default:
 		}
 
 		cluster, clusterErr = pClient.GetCluster()
