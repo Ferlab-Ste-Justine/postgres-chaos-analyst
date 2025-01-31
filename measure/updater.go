@@ -48,11 +48,11 @@ func (up *Updater) Initialize(conf *config.PgClientConfig) error {
 	return commErr
 }
 
-func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
+func (up *Updater) Run(conf *config.PgClientConfig) (Anomaly, error) {
 	ctx, _ := context.WithTimeout(context.Background(), conf.ConnectionTimeout)
 	conn, connErr := pgx.Connect(ctx, conf.GetConnStr())
 	if connErr != nil {
-		return false, connErr
+		return NoProblem, connErr
 	}
 
 	defer func() {
@@ -63,10 +63,10 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
 	tx, txErr := conn.Begin(ctx)
 	if txErr != nil {
-		return false, txErr
+		return NoProblem, txErr
 	}
 
-	lostTx := false
+	anomaly := NoProblem
 	if up.index > 0 {
 		queryErr := func() error {
 			ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
@@ -74,6 +74,7 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 			if queryErr != nil {
 				return queryErr
 			}
+
 			defer rows.Close()
 	
 			if rows.Next() {
@@ -83,36 +84,43 @@ func (up *Updater) Run(conf *config.PgClientConfig) (bool, error) {
 					return scanErr
 				}
 		
-				if (scanVal + 1) != up.index {
-					lostTx = true
+				if (scanVal + 1) < up.index {
+					anomaly = LostTransaction
+					up.index = scanVal + 1
+				} else if (scanVal + 1) > up.index {
+					anomaly = GhostTransaction
 					up.index = scanVal + 1
 				}
 			} else {
-				lostTx = true
+				rowsErr := rows.Err()
+				if rowsErr != nil {
+					return rowsErr
+				}
+				anomaly = LostTransaction
 			}
 
 			return nil
 		}()
 
 		if queryErr != nil {
-			return lostTx, queryErr 
+			return anomaly, queryErr 
 		}
 	}
 
 	_, txErr = tx.Exec(ctx, fmt.Sprintf("UPDATE %s SET value = $1;", up.TableName), up.index)
 	if txErr != nil {
-		return lostTx, txErr
+		return anomaly, txErr
 	}
 
 	ctx, _ = context.WithTimeout(context.Background(), conf.QueryTimeout)
 	commErr := tx.Commit(ctx)
 	if commErr != nil {
-		return lostTx, commErr
+		return anomaly, commErr
 	}
 
 	up.index += 1;
 
-	return lostTx, nil
+	return anomaly, nil
 }
 
 func (up *Updater) Cleanup(conf *config.PgClientConfig) error {
