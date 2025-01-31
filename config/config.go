@@ -56,14 +56,13 @@ type PatroniClientConfig struct {
 }
 
 type TestsConfig struct {
-	InsertDelete         bool          `yaml:"insert_delete"`
-	Update               bool
 	Switchovers          int64
 	LeaderCrashes        int64         `yaml:"leader_crashes"`
 	SyncStanbyCrashes    int64         `yaml:"sync_standby_crashes"`
 	ValidationInterval   time.Duration `yaml:"validation_interval"`
 	ChangeRecoverTimeout time.Duration `yaml:"change_recover_timeout"`
 	CrashRecoverTimeout  time.Duration `yaml:"crash_recover_timeout"`
+	CrashRebuildPause    time.Duration `yaml:"crash_rebuild_pause"`
 }
 
 type TerraformConfig struct {

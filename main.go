@@ -136,6 +136,11 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 				return
 			}
 
+			if conf.Tests.CrashRebuildPause.Nanoseconds() > 0 {
+				log.Infof("Pausing for %s before rebuilding server \"%s\"", conf.Tests.CrashRebuildPause.String(), nodeName)
+				time.Sleep(conf.Tests.CrashRebuildPause)
+			}
+
 			terErr = terraform.SetServerActivation(nodeName, true, &conf.Terraform, log)
 			if terErr != nil {
 				crResCh <- terErr
