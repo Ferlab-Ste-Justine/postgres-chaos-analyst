@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/Ferlab-Ste-Justine/postgres-chaos-analyst/config"
@@ -23,15 +24,27 @@ func init() {
 	switchoverResponseRegex = regexp.MustCompile(`^Successfully switched over to "(?P<leader>.*)"$`)
 }
 
+type PatroniMemberLag int64
+func (lag *PatroniMemberLag) UnmarshalJSON(data []byte) error {
+    val, err := strconv.ParseInt(string(data), 10, 64)
+	if err != nil {
+		*lag = PatroniMemberLag(-1)
+	} else {
+		*lag = PatroniMemberLag(val)
+	}
+
+    return nil
+}
+
 type PatroniMember struct {
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	State    string `json:"state"`
-	ApiUrl   string `json:"api_url"`
-	Host     string `json:"host"`
-	Port     int64  `json:"port"`
-	Timeline int64  `json:"timeline"`
-	Lag      int64  `json:"lag"`
+	Name     string           `json:"name"`
+	Role     string           `json:"role"`
+	State    string           `json:"state"`
+	ApiUrl   string           `json:"api_url"`
+	Host     string           `json:"host"`
+	Port     int64            `json:"port"`
+	Timeline int64            `json:"timeline"`
+	Lag      PatroniMemberLag `json:"lag"`
 }
 
 type PatroniCluster struct {
@@ -80,7 +93,7 @@ func (cluster *PatroniCluster) GetLeaderCandidate() PatroniMember {
 
 func (cluster *PatroniCluster) IsHealthy(expectedCount int) bool {
 	for _, member := range cluster.Members {
-		if member.State != "running" && member.State != "streaming" {
+		if (member.State != "running" && member.State != "streaming") || member.Lag < PatroniMemberLag(0) {
 			return false
 		}
 	}
