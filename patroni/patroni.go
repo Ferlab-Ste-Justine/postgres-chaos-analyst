@@ -258,24 +258,29 @@ func (pClient *PatroniClient) WaitForHealthy(timeout time.Duration, expectedCoun
 func (pClient *PatroniClient) ForceLeaderChange(timeout time.Duration) error {
 	begining := time.Now()
 
-	switchRes, switchErr := pClient.Switchover(true)
-	if switchErr != nil {
-		return switchErr
-	}
-
 	cluster, clusterErr := pClient.GetCluster()
 	if clusterErr != nil {
 		return clusterErr
 	}
 
-	if switchRes.NewLeader == "" {
-		switchRes.NewLeader = cluster.GetLeader().Name
+	switchRes, switchErr := pClient.Switchover(true)
+	if switchErr != nil {
+		return switchErr
 	}
 
 	healthErr := pClient.WaitForHealthy(timeout, len(cluster.Members))
 	if healthErr != nil {
 		return healthErr
 	}
+
+	if switchRes.NewLeader == "" {
+		cluster, clusterErr = pClient.GetCluster()
+		if clusterErr != nil {
+			return clusterErr
+		}
+		switchRes.NewLeader = cluster.GetLeader().Name
+	}
+
 
 	pClient.log.Infof("Switchover from leader \"%s\" to leader \"%s\" with healthy cluster in %s", switchRes.PreviousLeader, switchRes.NewLeader, time.Now().Sub(begining).String())
 
