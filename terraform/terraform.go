@@ -16,17 +16,19 @@ import (
 
 type ServerStatus struct {
 	Name string
-	Up   bool
+	Exists bool
+	Running bool
 }
 
 type ServersStatus struct {
 	Cluster []ServerStatus
 }
 
-func (status *ServersStatus) SetActivation(name string, up bool) {
+func (status *ServersStatus) SetStatus(name string, exists bool, running bool) {
 	for idx, _ := range status.Cluster {
-		if status.Cluster[idx].Name == name {
-			status.Cluster[idx].Up = up
+		if status.Cluster[idx].Name == name || name == "" {
+			status.Cluster[idx].Exists = exists
+			status.Cluster[idx].Running = running
 			break
 		}
 	}
@@ -53,7 +55,7 @@ func persistServersStatus(fPath string, status ServersStatus) error {
 	return os.WriteFile(fPath, data, 0644)
 }
 
-func SetServerActivation(name string, up bool, conf *config.TerraformConfig, log logger.Logger) error {
+func SetServerStatus(name string, exists bool, running bool, conf *config.TerraformConfig, log logger.Logger) error {
 	clusPath := path.Join(conf.Directory, conf.ClusterFile)
 	
 	status, readErr := readServerStatus(clusPath)
@@ -61,7 +63,7 @@ func SetServerActivation(name string, up bool, conf *config.TerraformConfig, log
 		return readErr
 	}
 
-	status.SetActivation(name, up)
+	status.SetStatus(name, exists, running)
 
 	perErr := persistServersStatus(clusPath, status)
 	if perErr != nil {
@@ -89,12 +91,19 @@ func SetServerActivation(name string, up bool, conf *config.TerraformConfig, log
 	}
 
 	var action string
-	if up {
-		action = "created"
-	} else {
+	if exists && running {
+		action = "set to exist and run"
+	} else if !exists {
 		action = "destroyed"
+	} else {
+		action = "stopped"
 	}
-	log.Infof("Server \"%s\" has been %s", name, action)
+
+	if name != "" {
+		log.Infof("Server \"%s\" has been %s", name, action)
+	} else {
+		log.Infof("All servers has been %s", action)
+	}
 
 	return nil
 }

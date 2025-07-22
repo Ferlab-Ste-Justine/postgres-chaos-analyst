@@ -63,26 +63,62 @@ func validateSwitchovers(conf config.Config, log logger.Logger) {
 	log.Infof("Diagnostics running %d patroni switchovers with %s rest interval in between:\n%s", conf.Tests.Switchovers, conf.Tests.ValidationInterval.String(), measRes.Measurements.String())
 }
 
-type CrashTarget int
+type DisruptionTarget int
 
 const (
-	Leader CrashTarget = iota
+	Leader DisruptionTarget = iota
 	SyncStandby
+	Cluster
 )
 
-func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Logger) {
+type DisruptionType int
+const (
+	Destruction DisruptionType = iota
+	Reboot
+)
+
+func validateLosses(conf config.Config, disruptionTarget DisruptionTarget, disruptionType DisruptionType, log logger.Logger) {
 	var table string
 	var iterCount int64
 	var action string
-	switch crashTarget {
+	var action2 string
+	switch disruptionTarget {
 	case Leader:
-		table = "crash_leader_updater"
-		iterCount = conf.Tests.LeaderCrashes
-		action = "leader crashes"
+		switch disruptionType {
+		case Destruction:
+			table = "loss_leader_updater"
+			iterCount = conf.Tests.LeaderLosses
+			action = "leader loss"
+			action2 = "rebuilding"
+		case Reboot:
+			table = "reboot_leader_updater"
+			iterCount = conf.Tests.LeaderLosses
+			action = "leader reboot"
+			action2 = "restarting"
+		}
 	case SyncStandby:
-		table = "crash_sync_standby_updater"
-		iterCount = conf.Tests.SyncStanbyCrashes
-		action = "sync standby crashes"
+		switch disruptionType {
+		case Destruction:
+			table = "loss_sync_standby_updater"
+			iterCount = conf.Tests.SyncStanbyLosses
+			action = "sync standby loss"
+			action2 = "rebuilding"
+		case Reboot:
+			table = "reboot_sync_standby_updater"
+			iterCount = conf.Tests.SyncStanbyLosses
+			action = "sync standby reboot"
+			action2 = "restarting"
+		}
+	case Cluster:
+		switch disruptionType {
+		case Destruction:
+			return
+		case Reboot:
+			table = "reboot_cluster_updater"
+			iterCount = conf.Tests.SyncStanbyLosses
+			action = "cluster reboot"
+			action2 = "restarting"
+		}
 	}
 	
 	doneCh := make(chan struct{})
@@ -121,33 +157,55 @@ func validateCrashes(conf config.Config, crashTarget CrashTarget, log logger.Log
 			}
 
 			var nodeName string
-			switch crashTarget {
+			switch disruptionTarget {
 			case Leader:
 				nodeName = clus.GetLeader().Name
 			case SyncStandby:
 				nodeName = clus.GetSyncStandby().Name
+			case Cluster:
+				nodeName = ""
 			}
 
 			beginning := time.Now()
 
-			terErr := terraform.SetServerActivation(nodeName, false, &conf.Terraform, log)
+			var terErr error
+			switch disruptionType {
+			case Destruction:
+				terErr = terraform.SetServerStatus(nodeName, false, true, &conf.Terraform, log)
+			case Reboot:
+				terErr = terraform.SetServerStatus(nodeName, true, false, &conf.Terraform, log)
+			}
 			if terErr != nil {
 				crResCh <- terErr
 				return
 			}
 
-			if conf.Tests.CrashRebuildPause.Nanoseconds() > 0 {
-				log.Infof("Pausing for %s before rebuilding server \"%s\"", conf.Tests.CrashRebuildPause.String(), nodeName)
-				time.Sleep(conf.Tests.CrashRebuildPause)
+			switch disruptionType {
+			case Destruction:
+				if conf.Tests.RebuildPause.Nanoseconds() > 0 {
+					log.Infof("Pausing for %s before %s server \"%s\"", conf.Tests.RebuildPause.String(), action2, nodeName)
+					time.Sleep(conf.Tests.RebuildPause)
+				}
+			case Reboot:
+				if conf.Tests.RestartPause.Nanoseconds() > 0 {
+					log.Infof("Pausing for %s before %s server \"%s\"", conf.Tests.RebuildPause.String(), action2, nodeName)
+					time.Sleep(conf.Tests.RebuildPause)
+				}
 			}
 
-			terErr = terraform.SetServerActivation(nodeName, true, &conf.Terraform, log)
+			terErr = terraform.SetServerStatus(nodeName, true, true, &conf.Terraform, log)
 			if terErr != nil {
 				crResCh <- terErr
 				return
 			}
 
-			healthErr := pClient.WaitForHealthy(conf.Tests.CrashRecoverTimeout, len(clus.Members))
+			var healthErr error
+			switch disruptionType {
+			case Destruction:
+				healthErr = pClient.WaitForHealthy(conf.Tests.LossRecoverTimeout, len(clus.Members))
+			case Reboot:
+				healthErr = pClient.WaitForHealthy(conf.Tests.RebootRecoverTimeout, len(clus.Members))
+			}
 			if healthErr != nil {
 				crResCh <- healthErr
 				return
@@ -181,12 +239,23 @@ func main() {
 		validateSwitchovers(conf, log)
 	}
 
-	if conf.Tests.LeaderCrashes > 0 {
-		validateCrashes(conf, Leader, log)
+	if conf.Tests.LeaderLosses > 0 {
+		validateLosses(conf, Leader, Destruction, log)
 	}
 
-	if conf.Tests.SyncStanbyCrashes > 0 {
-		validateCrashes(conf, SyncStandby, log)
+	if conf.Tests.SyncStanbyLosses > 0 {
+		validateLosses(conf, SyncStandby, Destruction, log)
 	}
 
+	if conf.Tests.LeaderReboots > 0 {
+		validateLosses(conf, Leader, Reboot, log)
+	}
+
+	if conf.Tests.SyncStanbyReboots > 0 {
+		validateLosses(conf, SyncStandby, Reboot, log)
+	}
+
+	if conf.Tests.ClusterReboots > 0 {
+		validateLosses(conf, Cluster, Reboot, log)
+	}
 }

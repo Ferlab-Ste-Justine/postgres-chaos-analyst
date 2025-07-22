@@ -57,12 +57,17 @@ type PatroniClientConfig struct {
 
 type TestsConfig struct {
 	Switchovers          int64
-	LeaderCrashes        int64         `yaml:"leader_crashes"`
-	SyncStanbyCrashes    int64         `yaml:"sync_standby_crashes"`
+	LeaderLosses         int64         `yaml:"leader_losses"`
+	SyncStanbyLosses     int64         `yaml:"sync_standby_losses"`
+	LeaderReboots        int64         `yaml:"leader_reboots"`
+	SyncStanbyReboots    int64         `yaml:"sync_standby_reboots"`
+	ClusterReboots       int64         `yaml:"cluster_reboots"`
 	ValidationInterval   time.Duration `yaml:"validation_interval"`
 	ChangeRecoverTimeout time.Duration `yaml:"change_recover_timeout"`
-	CrashRecoverTimeout  time.Duration `yaml:"crash_recover_timeout"`
-	CrashRebuildPause    time.Duration `yaml:"crash_rebuild_pause"`
+	LossRecoverTimeout   time.Duration `yaml:"loss_recover_timeout"`
+	RebootRecoverTimeout time.Duration `yaml:"reboot_recover_timeout"`
+	RebuildPause         time.Duration `yaml:"rebuild_pause"`
+	RestartPause         time.Duration `yaml:"restart_pause"`
 }
 
 type TerraformConfig struct {
