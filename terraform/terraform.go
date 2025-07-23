@@ -26,7 +26,13 @@ type ServersStatus struct {
 
 func (status *ServersStatus) SetStatus(name string, exists bool, running bool) {
 	for idx, _ := range status.Cluster {
-		if status.Cluster[idx].Name == name || name == "" {
+		if name == "" {
+			status.Cluster[idx].Exists = exists
+			status.Cluster[idx].Running = running
+			continue
+		}
+
+		if status.Cluster[idx].Name == name {
 			status.Cluster[idx].Exists = exists
 			status.Cluster[idx].Running = running
 			break
@@ -102,7 +108,7 @@ func SetServerStatus(name string, exists bool, running bool, conf *config.Terraf
 	if name != "" {
 		log.Infof("Server \"%s\" has been %s", name, action)
 	} else {
-		log.Infof("All servers has been %s", action)
+		log.Infof("All servers have been %s", action)
 	}
 
 	return nil

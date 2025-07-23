@@ -92,7 +92,7 @@ func validateLosses(conf config.Config, disruptionTarget DisruptionTarget, disru
 			action2 = "rebuilding"
 		case Reboot:
 			table = "reboot_leader_updater"
-			iterCount = conf.Tests.LeaderLosses
+			iterCount = conf.Tests.LeaderReboots
 			action = "leader reboot"
 			action2 = "restarting"
 		}
@@ -105,7 +105,7 @@ func validateLosses(conf config.Config, disruptionTarget DisruptionTarget, disru
 			action2 = "rebuilding"
 		case Reboot:
 			table = "reboot_sync_standby_updater"
-			iterCount = conf.Tests.SyncStanbyLosses
+			iterCount = conf.Tests.SyncStanbyReboots
 			action = "sync standby reboot"
 			action2 = "restarting"
 		}
@@ -115,7 +115,7 @@ func validateLosses(conf config.Config, disruptionTarget DisruptionTarget, disru
 			return
 		case Reboot:
 			table = "reboot_cluster_updater"
-			iterCount = conf.Tests.SyncStanbyLosses
+			iterCount = conf.Tests.ClusterReboots
 			action = "cluster reboot"
 			action2 = "restarting"
 		}
@@ -183,13 +183,21 @@ func validateLosses(conf config.Config, disruptionTarget DisruptionTarget, disru
 			switch disruptionType {
 			case Destruction:
 				if conf.Tests.RebuildPause.Nanoseconds() > 0 {
-					log.Infof("Pausing for %s before %s server \"%s\"", conf.Tests.RebuildPause.String(), action2, nodeName)
+					if nodeName != "" {
+						log.Infof("Pausing for %s before %s server \"%s\"", conf.Tests.RebuildPause.String(), action2, nodeName)
+					} else {
+						log.Infof("Pausing for %s before %s all servers", conf.Tests.RebuildPause.String(), action2)
+					}
 					time.Sleep(conf.Tests.RebuildPause)
 				}
 			case Reboot:
 				if conf.Tests.RestartPause.Nanoseconds() > 0 {
-					log.Infof("Pausing for %s before %s server \"%s\"", conf.Tests.RebuildPause.String(), action2, nodeName)
-					time.Sleep(conf.Tests.RebuildPause)
+					if nodeName != "" {
+						log.Infof("Pausing for %s before %s server \"%s\"", conf.Tests.RestartPause.String(), action2, nodeName)
+					} else {
+						log.Infof("Pausing for %s before %s all servers", conf.Tests.RestartPause.String(), action2, nodeName)
+					}
+					time.Sleep(conf.Tests.RestartPause)
 				}
 			}
 
