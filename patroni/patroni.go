@@ -210,7 +210,7 @@ func (pClient *PatroniClient) Switchover(excludeLeader bool) (SwitchoverResult, 
 
 	body, bodyErr := json.Marshal(reqBody)
 	if bodyErr != nil {
-		return result, clusterErr
+		return result, bodyErr
 	}
 
 	res, resErr := pClient.client.Post(fmt.Sprintf("https://%s/switchover", pClient.endpoint), "application/json", bytes.NewBuffer(body))
